@@ -1,0 +1,109 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# Logistic Regression & Linear Discriminant Analysis
+# Reading a CSV file
+BC <- read.csv(file = "C:/Venu/UCI DataSets/Breast-cancer.csv", header = TRUE,stringsAsFactors = TRUE)
+
+# Data Cleansing
+sum(is.na(BC))
+BCdata <- na.omit(BC)
+levels(BCdata$Class)
+levels(BCdata$Class)[1]<-"0"
+levels(BCdata$Class)[2]<-"1"
+str(BCdata)
+
+# Logistic Regression
+BC.logit <- glm(Class~.,data = BCdata,family = binomial)
+summary(BC.logit)
+
+
+# Calculating the Logistic Probabilities
+BC.logit.probs <- predict(BC.logit,type = "response")
+attach(BCdata)
+
+# Predicting the Class
+BC.logit.pred <- rep("0", 277)
+BC.logit.pred[BC.logit.probs>0.5]="1"
+
+# Constructing 2x2 table 
+table(BC.logit.pred,Class)
+(180+44)/277
+mean(BC.logit.pred==Class)
+
+# Creating training and testing data sets
+train <- sample(1:nrow(BCdata), 200)
+BCdata.test <- BCdata[-train,]
+Class.test <- Class[-train]
+
+# Logistic model for training set
+BC.logit.train<- glm(Class~.,data = BCdata,family = binomial,subset = train)
+summary(BC.logit.train)
+par(mfrow=c(2,2))
+plot(BC.logit.train)
+
+
+# Predicting the probabilities and Classes for the test data set
+BC.logit.test.probs <- predict(BC.logit.train,BCdata.test,type = "response")
+BC.logit.test.pred <- rep("0",77)
+BC.logit.test.pred[BC.logit.test.probs>0.5] <- "1"
+
+class(BC.logit.test.pred)
+Pred.updated <- as.factor(BC.logit.test.pred)
+Pred.updated1 <- as.numeric(BC.logit.test.pred)
+
+# Constrcuting the 2x2 cross table
+library(caret)
+library(gmodels)
+CrossTable(Class.test,Pred.updated)
+confusionMatrix(Class.test,Pred.updated,positive = "1")
+
+temp <- data.frame(Class.test,Pred.updated1)
+
+# ROC plots and AUC using ROCR package
+library(ROCR)
+data(temp)
+rocr.pred <- prediction(temp$Pred.updated1,temp$Class.test)
+rocr.perf <- performance(rocr.pred, "tpr","fpr")
+plot(rocr.perf)
+abline(a=0,b=1)
+
+acc.perf = performance(rocr.pred, measure = "acc")
+plot(acc.perf)
+
+rocr.perf1 <- performance(rocr.pred,"prec","rec")
+plot(rocr.perf1)
+
+
+rocr.perf2 <- performance(rocr.pred, "auc")
+rocr.perf2@y.values
+
+#ROC curve using pROC Package
+library(pROC)
+roc.BC <- roc(temp$Class.test,temp$Pred.updated)
+roc.BC$auc
+plot(roc.BC)
+coords(roc.BC,x="best",input = "threshold", best.method = "youden",transpose = TRUE)
+
+#Linear Discriminant Analysis
+library(MASS)
+BC.lda <- lda(Class~.,data = BCdata,subset = train)
+BC.lda
+plot(BC.lda)
+BC.lda.pred = predict(BC.lda,BCdata.test)
+names(BC.lda.pred)
+BC.lda.class <- BC.lda.pred$class
+CrossTable(BC.lda.class,Class.test)
+confusionMatrix(Class.test,Pred.updated,positive = "1")
+```
+
